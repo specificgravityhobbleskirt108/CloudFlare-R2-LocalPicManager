@@ -1,0 +1,14 @@
+name = "my-picbed"           # 改成你的 Worker 名称
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "my-r2-bucket" # 改成你的 R2 桶名称
+
+[vars]
+# 自定义域名（可选，没有就留空）
+CUSTOM_DOMAIN = ""
+
+# ⚠️ AUTH_TOKEN 不要写在这里！
+# 请用 wrangler secret put AUTH_TOKEN 命令单独设置（见 README）

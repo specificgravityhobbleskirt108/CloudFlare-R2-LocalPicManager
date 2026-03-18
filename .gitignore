@@ -1,0 +1,14 @@
+# Wrangler
+.wrangler/
+.dev.vars
+
+# OpenClaw Skill 配置（含 Token，不进版本控制）
+skills/picmanager/.env
+
+# Node
+node_modules/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PicManager — 图床管理</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+<style>
+/* ===== CSS Reset & Variables ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d2d;
+  --bg-hover: #3a3a3a;
+  --bg-active: #454545;
+  --border: #3e3e3e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --text-muted: #6a6a6a;
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-dim: rgba(10,132,255,0.15);
+  --danger: #ff453a;
+  --danger-hover: #ff6961;
+  --success: #30d158;
+  --warning: #ffd60a;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --sidebar-width: 220px;
+  --toolbar-height: 48px;
+  --statusbar-height: 32px;
+  --transition: 0.2s ease;
+}
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.4;
+}
+button { font-family: inherit; font-size: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select { font-family: inherit; font-size: inherit; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #777; }
+
+/* ===== Layout ===== */
+#app { display: flex; height: 100vh; flex-direction: column; }
+#toolbar {
+  height: var(--toolbar-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+#main-container { display: flex; flex: 1; overflow: hidden; }
+#sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+#content { flex: 1; overflow-y: auto; padding: 16px; position: relative; }
+#statusbar {
+  height: var(--statusbar-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+/* ===== Sidebar ===== */
+.sidebar-section { padding: 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px; font-weight: 600; }
+.sidebar-logo { padding: 20px 16px; text-align: center; border-bottom: 1px solid var(--border); }
+.sidebar-logo h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.5px; }
+.sidebar-logo p { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.stat-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.stat-item .label { color: var(--text-secondary); }
+.stat-item .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.nav-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-btn.active { background: var(--accent-dim); color: var(--accent); }
+.nav-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ===== Toolbar ===== */
+.toolbar-group { display: flex; align-items: center; gap: 8px; }
+.toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.toolbar-spacer { flex: 1; }
+.search-box {
+  display: flex; align-items: center; gap: 6px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; height: 32px;
+}
+.search-box input { background: none; border: none; outline: none; color: var(--text-primary); width: 180px; }
+.search-box svg { width: 14px; height: 14px; color: var(--text-muted); flex-shrink: 0; }
+.tb-btn {
+  height: 32px; padding: 0 10px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 6px;
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.tb-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tb-btn.active { background: var(--accent-dim); color: var(--accent); }
+.tb-btn svg { width: 16px; height: 16px; }
+.tb-btn-primary {
+  background: var(--accent); color: #fff; padding: 0 14px; height: 32px;
+  border-radius: var(--radius); display: flex; align-items: center; gap: 6px;
+  font-weight: 500; transition: background var(--transition);
+}
+.tb-btn-primary:hover { background: var(--accent-hover); }
+.tb-btn-danger {
+  background: var(--danger); color: #fff; padding: 0 14px; height: 32px;
+  border-radius: var(--radius); display: flex; align-items: center; gap: 6px;
+  font-weight: 500; transition: background var(--transition);
+}
+.tb-btn-danger:hover { background: var(--danger-hover); }
+select.tb-select {
+  height: 32px; background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-primary); padding: 0 8px;
+  outline: none; cursor: pointer;
+}
+.grid-size-slider { width: 80px; accent-color: var(--accent); }
+
+/* ===== Drop Zone ===== */
+#drop-overlay {
+  position: fixed; inset: 0; background: rgba(10,132,255,0.12);
+  border: 3px dashed var(--accent); z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 600; color: var(--accent);
+}
+#drop-overlay.visible { display: flex; }
+
+/* ===== Image Grid ===== */
+.grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--thumb-size, 180px), 1fr));
+}
+.grid-item {
+  position: relative; border-radius: var(--radius); overflow: hidden;
+  background: var(--bg-tertiary); border: 2px solid transparent;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  cursor: pointer; aspect-ratio: 1;
+}
+.grid-item:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+.grid-item.selected { border-color: var(--accent); }
+.grid-item img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; transition: transform 0.3s;
+}
+.grid-item:hover img { transform: scale(1.03); }
+.grid-item .checkbox {
+  position: absolute; top: 8px; left: 8px; width: 22px; height: 22px;
+  border-radius: 50%; border: 2px solid rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity var(--transition); z-index: 2;
+}
+.grid-item:hover .checkbox, .grid-item.selected .checkbox { opacity: 1; }
+.grid-item.selected .checkbox { background: var(--accent); border-color: var(--accent); }
+.grid-item .info-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  padding: 24px 10px 10px; opacity: 0; transition: opacity var(--transition);
+}
+.grid-item:hover .info-overlay { opacity: 1; }
+.info-overlay .fname { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+.info-overlay .fmeta { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.grid-item .quick-actions {
+  position: absolute; top: 8px; right: 8px; display: flex; gap: 4px;
+  opacity: 0; transition: opacity var(--transition); z-index: 2;
+}
+.grid-item:hover .quick-actions { opacity: 1; }
+.quick-action-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition);
+}
+.quick-action-btn:hover { background: rgba(0,0,0,0.85); }
+.quick-action-btn svg { width: 14px; height: 14px; color: #fff; }
+
+/* ===== Loading & Empty ===== */
+.loading-spinner {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 300px; gap: 16px; color: var(--text-muted);
+}
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 400px; gap: 12px; color: var(--text-muted);
+}
+.empty-state svg { width: 64px; height: 64px; opacity: 0.3; }
+
+/* ===== Modals ===== */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 100; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); opacity: 0; visibility: hidden;
+  transition: opacity 0.25s, visibility 0.25s;
+}
+.modal-backdrop.visible { opacity: 1; visibility: visible; }
+.modal {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; max-width: 480px; width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  transform: scale(0.95); transition: transform 0.25s;
+}
+.modal-backdrop.visible .modal { transform: scale(1); }
+.modal h2 { font-size: 18px; margin-bottom: 16px; font-weight: 600; }
+.modal-field { margin-bottom: 16px; }
+.modal-field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500; }
+.modal-field input {
+  width: 100%; padding: 10px 12px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-primary); outline: none; transition: border-color var(--transition);
+}
+.modal-field input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.btn {
+  padding: 8px 16px; border-radius: var(--radius); font-weight: 500;
+  transition: all var(--transition);
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+
+/* ===== Lightbox ===== */
+#lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s;
+}
+#lightbox.visible { opacity: 1; visibility: visible; }
+#lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 4px; user-select: none; }
+.lb-close {
+  position: absolute; top: 16px; right: 16px; width: 40px; height: 40px;
+  border-radius: 50%; background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition);
+}
+.lb-close:hover { background: rgba(255,255,255,0.2); }
+.lb-close svg { width: 20px; height: 20px; color: #fff; }
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.1); display: flex;
+  align-items: center; justify-content: center;
+  transition: background var(--transition);
+}
+.lb-nav:hover { background: rgba(255,255,255,0.2); }
+.lb-nav svg { width: 20px; height: 20px; color: #fff; }
+.lb-prev { left: 16px; }
+.lb-next { right: 16px; }
+.lb-info {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: var(--radius);
+  font-size: 12px; color: rgba(255,255,255,0.8); white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+.lb-toolbar {
+  position: absolute; bottom: 16px; right: 16px; display: flex; gap: 8px;
+}
+.lb-toolbar button {
+  padding: 6px 12px; background: rgba(255,255,255,0.1); border-radius: var(--radius-sm);
+  color: #fff; font-size: 12px; transition: background var(--transition);
+}
+.lb-toolbar button:hover { background: rgba(255,255,255,0.2); }
+
+/* ===== Editor Modal ===== */
+#editor-modal .modal { max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto; }
+.editor-container { display: flex; gap: 16px; flex-wrap: wrap; }
+.editor-preview { flex: 1; min-width: 300px; max-height: 450px; background: #111; border-radius: var(--radius); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+.editor-preview img { max-width: 100%; max-height: 450px; display: block; }
+.editor-controls { width: 240px; flex-shrink: 0; }
+.editor-controls .control-group { margin-bottom: 16px; }
+.editor-controls .control-group h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 8px; }
+.control-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.control-row label { font-size: 12px; color: var(--text-secondary); width: 40px; flex-shrink: 0; }
+.control-row input[type="number"] {
+  width: 80px; padding: 6px 8px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none;
+}
+.control-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.control-row span.val { font-size: 12px; color: var(--text-secondary); width: 36px; text-align: right; }
+.ratio-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.ratio-btn {
+  padding: 4px 10px; border-radius: var(--radius-sm); font-size: 12px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.ratio-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.ratio-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.format-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.format-btn {
+  padding: 4px 10px; border-radius: var(--radius-sm); font-size: 12px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.format-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.format-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.lock-btn { padding: 2px 6px; border-radius: var(--radius-sm); font-size: 14px; color: var(--accent); }
+
+/* ===== Toast ===== */
+#toast-container { position: fixed; top: 16px; right: 16px; z-index: 500; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  padding: 10px 16px; border-radius: var(--radius); font-size: 13px;
+  color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: toastIn 0.3s ease; min-width: 200px; max-width: 360px;
+  display: flex; align-items: center; gap: 8px;
+  backdrop-filter: blur(8px);
+}
+.toast.success { background: rgba(48,209,88,0.9); }
+.toast.error { background: rgba(255,69,58,0.9); }
+.toast.warning { background: rgba(255,214,10,0.9); color: #1e1e1e; }
+.toast.info { background: rgba(10,132,255,0.9); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== Upload Progress ===== */
+.upload-progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px; background: var(--accent);
+  z-index: 999; transition: width 0.3s; border-radius: 0 2px 2px 0;
+}
+
+/* ===== Link Copy Popup ===== */
+.copy-popup {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  min-width: 320px;
+}
+.copy-popup .copy-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.copy-popup .copy-row:last-child { margin-bottom: 0; }
+.copy-popup .copy-label { font-size: 11px; color: var(--text-muted); width: 60px; flex-shrink: 0; text-transform: uppercase; }
+.copy-popup .copy-input {
+  flex: 1; padding: 6px 8px; background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-primary); font-size: 12px; outline: none;
+}
+.copy-popup .copy-btn {
+  padding: 6px 10px; background: var(--accent); color: #fff;
+  border-radius: var(--radius-sm); font-size: 12px; white-space: nowrap;
+}
+.copy-popup .copy-btn:hover { background: var(--accent-hover); }
+
+/* ===== Context Menu ===== */
+.context-menu {
+  position: fixed; background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px 0; min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 300;
+}
+.context-menu-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px; width: 100%;
+  color: var(--text-primary); transition: background var(--transition); font-size: 13px;
+}
+.context-menu-item:hover { background: var(--bg-hover); }
+.context-menu-item.danger { color: var(--danger); }
+.context-menu-item.danger:hover { background: rgba(255,69,58,0.1); }
+.context-menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* ===== Breadcrumb ===== */
+.breadcrumb {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 16px;
+  font-size: 13px; flex-wrap: wrap;
+}
+.breadcrumb-item {
+  color: var(--accent); cursor: pointer; padding: 2px 4px;
+  border-radius: var(--radius-sm); transition: background var(--transition);
+}
+.breadcrumb-item:hover { background: var(--accent-dim); }
+.breadcrumb-item.current { color: var(--text-primary); cursor: default; }
+.breadcrumb-item.current:hover { background: none; }
+.breadcrumb-sep { color: var(--text-muted); font-size: 11px; }
+
+/* ===== Folder Card ===== */
+.folder-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg-tertiary); border: 2px solid transparent;
+  border-radius: var(--radius); aspect-ratio: 1; cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  position: relative; gap: 8px;
+}
+.folder-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+.folder-card svg { width: 48px; height: 48px; color: var(--accent); opacity: 0.7; }
+.folder-card .folder-name {
+  font-size: 12px; color: var(--text-primary); text-align: center;
+  max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-card .folder-actions {
+  position: absolute; top: 6px; right: 6px; display: flex; gap: 4px;
+  opacity: 0; transition: opacity var(--transition);
+}
+.folder-card:hover .folder-actions { opacity: 1; }
+
+/* ===== Folder Tree in Sidebar ===== */
+.folder-tree { display: flex; flex-direction: column; gap: 2px; }
+.folder-tree-item {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: var(--radius-sm); cursor: pointer; font-size: 13px;
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.folder-tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.folder-tree-item.active { background: var(--accent-dim); color: var(--accent); }
+.folder-tree-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.folder-tree-item .folder-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== Move Modal ===== */
+.folder-select-list { max-height: 240px; overflow-y: auto; }
+.folder-select-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition);
+}
+.folder-select-item:hover { background: var(--bg-hover); }
+.folder-select-item.selected { background: var(--accent-dim); color: var(--accent); }
+.folder-select-item svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent); }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  #sidebar { display: none; }
+  .search-box input { width: 100px; }
+  .editor-controls { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Toolbar -->
+  <div id="toolbar">
+    <div class="toolbar-group">
+      <button class="tb-btn-primary" onclick="showUploadDialog()" title="上传图片">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        上传
+      </button>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-input" placeholder="搜索文件名…" oninput="filterImages()">
+      </div>
+    </div>
+    <div class="toolbar-group">
+      <select class="tb-select" id="sort-select" onchange="sortImages()">
+        <option value="time-desc">最新上传</option>
+        <option value="time-asc">最早上传</option>
+        <option value="size-desc">文件最大</option>
+        <option value="size-asc">文件最小</option>
+        <option value="name-asc">名称 A-Z</option>
+        <option value="name-desc">名称 Z-A</option>
+      </select>
+    </div>
+    <div class="toolbar-spacer"></div>
+    <div class="toolbar-group" id="batch-actions" style="display:none;">
+      <button class="tb-btn" onclick="batchCopyLinks()" title="批量复制链接">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        复制链接
+      </button>
+      <button class="tb-btn" onclick="showMoveDialog()" title="移动到文件夹">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        移动
+      </button>
+      <button class="tb-btn-danger" onclick="batchDelete()" title="批量删除">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        删除
+      </button>
+    </div>
+    <div class="toolbar-group">
+      <label title="网格大小" style="display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <input type="range" class="grid-size-slider" id="grid-slider" min="100" max="320" value="180" oninput="setGridSize(this.value)">
+      </label>
+    </div>
+    <div class="toolbar-sep"></div>
+    <div class="toolbar-group">
+      <button class="tb-btn" onclick="loadImages()" title="刷新">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+      <button class="tb-btn" onclick="showSettings()" title="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="main-container">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-logo">
+        <h1>PicManager</h1>
+        <p>图床管理工具</p>
+      </div>
+      <div class="sidebar-section">
+        <h3 style="display:flex;align-items:center;justify-content:space-between;">
+          文件夹
+          <button onclick="showCreateFolderDialog()" title="新建文件夹" style="color:var(--accent);font-size:16px;line-height:1;padding:0 2px;">+</button>
+        </h3>
+        <div class="folder-tree" id="folder-tree">
+          <div class="folder-tree-item active" onclick="navigateTo('')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="folder-label">全部文件</span>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <h3>统计</h3>
+        <div class="stat-item"><span class="label">文件总数</span><span class="value" id="stat-count">—</span></div>
+        <div class="stat-item"><span class="label">总占用</span><span class="value" id="stat-size">—</span></div>
+        <div class="stat-item"><span class="label">平均大小</span><span class="value" id="stat-avg">—</span></div>
+      </div>
+      <div class="sidebar-section">
+        <h3>快速操作</h3>
+        <button class="nav-btn" onclick="showUploadDialog()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传图片
+        </button>
+        <button class="nav-btn" onclick="selectAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          全选
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content">
+      <div id="breadcrumb" class="breadcrumb"></div>
+      <div id="image-grid" class="grid"></div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div id="statusbar">
+    <span id="status-selected"></span>
+    <span id="status-total"></span>
+    <span id="status-domain" style="margin-left:auto;"></span>
+  </div>
+</div>
+
+<!-- Drop Overlay -->
+<div id="drop-overlay">拖放图片到此处上传</div>
+
+<!-- Upload Progress -->
+<div id="upload-progress" class="upload-progress-bar" style="width:0;display:none;"></div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <button class="lb-nav lb-prev" onclick="lightboxNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+  <button class="lb-nav lb-next" onclick="lightboxNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+  <img id="lb-image" src="" alt="">
+  <div class="lb-info" id="lb-info"></div>
+  <div class="lb-toolbar">
+    <button onclick="copyCurrentLink('url')">复制链接</button>
+    <button onclick="copyCurrentLink('md')">Markdown</button>
+    <button onclick="openEditor(lightboxIndex)">编辑</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('settings-modal')">
+  <div class="modal">
+    <h2>设置</h2>
+    <div class="modal-field">
+      <label>Worker URL</label>
+      <input type="text" id="cfg-worker-url" placeholder="https://your-worker.workers.dev">
+    </div>
+    <div class="modal-field">
+      <label>Auth Token</label>
+      <input type="password" id="cfg-auth-token" placeholder="你的鉴权令牌">
+    </div>
+    <div class="modal-field">
+      <label>自定义域名（可选，用于生成链接）</label>
+      <input type="text" id="cfg-custom-domain" placeholder="https://img.example.com">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('settings-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div id="delete-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('delete-modal')">
+  <div class="modal">
+    <h2>确认删除</h2>
+    <p id="delete-msg" style="color:var(--text-secondary);margin-bottom:16px;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('delete-modal')">取消</button>
+      <button class="btn btn-danger" id="delete-confirm-btn">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename Modal -->
+<div id="rename-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('rename-modal')">
+  <div class="modal" style="max-width:440px;">
+    <h2>重命名</h2>
+    <p style="color:var(--text-muted);font-size:12px;margin-bottom:12px;" id="rename-old-name"></p>
+    <div class="modal-field">
+      <label>新文件名（含扩展名）</label>
+      <input type="text" id="rename-input" placeholder="example.jpg">
+    </div>
+    <p style="color:var(--text-muted);font-size:11px;margin-bottom:4px;">新链接预览：</p>
+    <p style="color:var(--accent);font-size:12px;word-break:break-all;" id="rename-preview"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('rename-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doRename()">确认重命名</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Folder Modal -->
+<div id="create-folder-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('create-folder-modal')">
+  <div class="modal" style="max-width:400px;">
+    <h2>新建文件夹</h2>
+    <div class="modal-field">
+      <label>文件夹名称</label>
+      <input type="text" id="new-folder-name" placeholder="例如：blog-post-title">
+    </div>
+    <p style="color:var(--text-muted);font-size:11px;">文件夹将创建在当前目录下。名称建议使用英文、数字和连字符。</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('create-folder-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doCreateFolder()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move to Folder Modal -->
+<div id="move-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('move-modal')">
+  <div class="modal" style="max-width:400px;">
+    <h2>移动到文件夹</h2>
+    <p style="color:var(--text-secondary);font-size:12px;margin-bottom:12px;" id="move-info"></p>
+    <div class="folder-select-list" id="move-folder-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('move-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doMoveToFolder()">移动</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy Links Modal -->
+<div id="copy-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('copy-modal')">
+  <div class="modal" style="max-width:520px;">
+    <h2 id="copy-modal-title">复制链接</h2>
+    <div id="copy-modal-body"></div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button class="btn btn-secondary" onclick="closeModal('copy-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Dialog -->
+<div id="upload-modal" class="modal-backdrop" onclick="if(event.target===this)closeModal('upload-modal')">
+  <div class="modal" style="max-width:520px;">
+    <h2>上传图片</h2>
+    <div id="upload-dropzone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all 0.2s;color:var(--text-muted);"
+         onclick="document.getElementById('file-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin-bottom:8px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>拖放文件到此处，或点击选择</p>
+      <p style="font-size:11px;margin-top:4px;">支持 JPG / PNG / WebP / GIF / AVIF，最大 20MB</p>
+    </div>
+    <input type="file" id="file-input" multiple accept="image/*" style="display:none;" onchange="handleFileSelect(this.files)">
+    <div id="upload-list" style="margin-top:12px;max-height:200px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('upload-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor Modal -->
+<div id="editor-modal" class="modal-backdrop" onclick="if(event.target===this)closeEditor()">
+  <div class="modal">
+    <h2>图片编辑</h2>
+    <div class="editor-container">
+      <div class="editor-preview" id="editor-preview-container">
+        <img id="editor-image" src="">
+      </div>
+      <div class="editor-controls">
+        <div class="control-group">
+          <h4>裁切</h4>
+          <div class="ratio-btns">
+            <button class="ratio-btn active" onclick="setCropRatio(NaN, this)">自由</button>
+            <button class="ratio-btn" onclick="setCropRatio(1, this)">1:1</button>
+            <button class="ratio-btn" onclick="setCropRatio(4/3, this)">4:3</button>
+            <button class="ratio-btn" onclick="setCropRatio(16/9, this)">16:9</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <h4>质量</h4>
+          <div class="control-row">
+            <input type="range" id="quality-slider" min="1" max="100" value="85" oninput="document.getElementById('quality-val').textContent=this.value">
+            <span class="val" id="quality-val">85</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <h4>尺寸</h4>
+          <div class="control-row">
+            <label>宽</label>
+            <input type="number" id="resize-w" placeholder="宽" oninput="onResizeInput('w')">
+            <button class="lock-btn" id="lock-ratio-btn" onclick="toggleLockRatio()" title="锁定比例">&#128279;</button>
+            <label>高</label>
+            <input type="number" id="resize-h" placeholder="高" oninput="onResizeInput('h')">
+          </div>
+        </div>
+        <div class="control-group">
+          <h4>格式</h4>
+          <div class="format-btns">
+            <button class="format-btn active" data-fmt="original" onclick="setFormat('original',this)">原格式</button>
+            <button class="format-btn" data-fmt="image/jpeg" onclick="setFormat('image/jpeg',this)">JPG</button>
+            <button class="format-btn" data-fmt="image/png" onclick="setFormat('image/png',this)">PNG</button>
+            <button class="format-btn" data-fmt="image/webp" onclick="setFormat('image/webp',this)">WebP</button>
+          </div>
+        </div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-primary" onclick="applyEdits(true)" style="width:100%;">覆盖原图上传</button>
+          <button class="btn btn-secondary" onclick="applyEdits(false)" style="width:100%;">上传为新副本</button>
+          <button class="btn btn-secondary" onclick="closeEditor()" style="width:100%;">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for upload via drag-drop -->
+<input type="file" id="global-file-input" multiple accept="image/*" style="display:none;" onchange="handleFileSelect(this.files)">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script>
+// ===== State =====
+let allImages = [];       // 全部文件（flat list from /list?all=1）
+let images = [];          // 当前文件夹下的文件
+let filteredImages = [];
+let currentFolders = [];  // 当前文件夹下的子文件夹
+let allFolders = [];      // 所有已知文件夹
+let currentPath = '';     // 当前路径前缀，如 "" 或 "blog/"
+let selectedKeys = new Set();
+let lightboxIndex = -1;
+let cropper = null;
+let editorOriginalImage = null;
+let editorKey = '';
+let editorNaturalWidth = 0;
+let editorNaturalHeight = 0;
+let lockRatio = true;
+let editorFormat = 'original';
+let editorMimeType = '';
+let moveTargetFolder = '';
+
+// ===== Config =====
+function getConfig() {
+  return {
+    workerUrl: (localStorage.getItem('pm_worker_url') || '').replace(/\/+$/, ''),
+    authToken: localStorage.getItem('pm_auth_token') || '',
+    customDomain: (localStorage.getItem('pm_custom_domain') || '').replace(/\/+$/, ''),
+  };
+}
+
+function hasConfig() {
+  const c = getConfig();
+  return c.workerUrl && c.authToken;
+}
+
+function getImageUrl(key) {
+  const c = getConfig();
+  const base = c.customDomain || c.workerUrl;
+  return `${base}/${key}`;
+}
+
+// ===== Init =====
+document.addEventListener('DOMContentLoaded', () => {
+  if (!hasConfig()) {
+    showSettings(true);
+  } else {
+    loadImages();
+  }
+  setupDragDrop();
+});
+
+// ===== Settings =====
+function showSettings(firstTime) {
+  const c = getConfig();
+  document.getElementById('cfg-worker-url').value = c.workerUrl;
+  document.getElementById('cfg-auth-token').value = c.authToken;
+  document.getElementById('cfg-custom-domain').value = c.customDomain;
+  openModal('settings-modal');
+}
+
+function saveSettings() {
+  const url = document.getElementById('cfg-worker-url').value.trim();
+  const token = document.getElementById('cfg-auth-token').value.trim();
+  const domain = document.getElementById('cfg-custom-domain').value.trim();
+  if (!url || !token) { toast('请填写 Worker URL 和 Auth Token', 'warning'); return; }
+  localStorage.setItem('pm_worker_url', url);
+  localStorage.setItem('pm_auth_token', token);
+  localStorage.setItem('pm_custom_domain', domain);
+  closeModal('settings-modal');
+  toast('设置已保存', 'success');
+  loadImages();
+}
+
+// ===== API =====
+async function apiRequest(method, path, body, onProgress) {
+  const c = getConfig();
+  const headers = { 'X-Auth-Token': c.authToken };
+  const url = c.workerUrl + path;
+
+  if (onProgress && body instanceof FormData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
+      xhr.setRequestHeader('X-Auth-Token', c.authToken);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(JSON.parse(xhr.responseText));
+        } else {
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('网络错误'));
+      xhr.send(body);
+    });
+  }
+
+  const opts = { method, headers };
+  if (body) opts.body = body;
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ===== Load Images =====
+async function loadImages() {
+  if (!hasConfig()) return;
+  const grid = document.getElementById('image-grid');
+  grid.innerHTML = '<div class="loading-spinner"><div class="spinner"></div><span>加载中…</span></div>';
+
+  try {
+    // 先加载全部文件列表（用于统计和文件夹发现）
+    const allData = await apiRequest('GET', '/list?all=1');
+    allImages = allData || [];
+
+    // 从 key 中提取所有文件夹
+    const folderSet = new Set();
+    allImages.forEach(img => {
+      const parts = img.key.split('/');
+      if (parts.length > 1) {
+        // 逐级提取文件夹路径
+        for (let i = 1; i < parts.length; i++) {
+          folderSet.add(parts.slice(0, i).join('/') + '/');
+        }
+      }
+    });
+    allFolders = [...folderSet].sort();
+
+    // 渲染侧边栏文件夹树
+    renderFolderTree();
+
+    // 按当前路径过滤
+    navigateTo(currentPath, true);
+  } catch (e) {
+    grid.innerHTML = `<div class="empty-state"><p>加载失败: ${e.message}</p><button class="btn btn-primary" onclick="loadImages()" style="margin-top:12px;">重试</button></div>`;
+    toast('加载失败: ' + e.message, 'error');
+  }
+}
+
+// 导航到指定文件夹
+function navigateTo(path, skipReload) {
+  currentPath = path;
+  selectedKeys.clear();
+  updateBatchActions();
+
+  // 过滤出当前文件夹的直接子文件和子文件夹
+  if (path === '') {
+    // 根目录：显示没有 / 的文件 + 一级文件夹
+    images = allImages.filter(img => !img.key.includes('/') && !img.key.endsWith('.folder'));
+    currentFolders = allFolders.filter(f => !f.slice(0, -1).includes('/'));
+  } else {
+    // 子目录：显示该前缀下的直接子文件
+    images = allImages.filter(img => {
+      if (!img.key.startsWith(path)) return false;
+      const rest = img.key.slice(path.length);
+      return !rest.includes('/') && !img.key.endsWith('.folder');
+    });
+    // 直接子文件夹
+    currentFolders = allFolders.filter(f => {
+      if (!f.startsWith(path)) return false;
+      const rest = f.slice(path.length);
+      // rest 应该是 "subfolder/"，即只有一个 /
+      return rest.length > 0 && rest.indexOf('/') === rest.length - 1;
+    });
+  }
+
+  renderBreadcrumb();
+  renderFolderTree();
+  sortImages();
+}
+
+// 渲染面包屑导航
+function renderBreadcrumb() {
+  const bc = document.getElementById('breadcrumb');
+  if (!currentPath) {
+    bc.innerHTML = '<span class="breadcrumb-item current">全部文件</span>';
+    return;
+  }
+  const parts = currentPath.replace(/\/$/, '').split('/');
+  let html = '<span class="breadcrumb-item" onclick="navigateTo(\'\')">全部文件</span>';
+  let accumulated = '';
+  parts.forEach((part, i) => {
+    accumulated += part + '/';
+    html += '<span class="breadcrumb-sep">/</span>';
+    if (i === parts.length - 1) {
+      html += `<span class="breadcrumb-item current">${escapeHtml(part)}</span>`;
+    } else {
+      const path = accumulated;
+      html += `<span class="breadcrumb-item" onclick="navigateTo('${escapeJs(path)}')">${escapeHtml(part)}</span>`;
+    }
+  });
+  bc.innerHTML = html;
+}
+
+// 渲染侧边栏文件夹树
+function renderFolderTree() {
+  const tree = document.getElementById('folder-tree');
+  let html = `<div class="folder-tree-item ${currentPath === '' ? 'active' : ''}" onclick="navigateTo('')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="folder-label">全部文件</span>
+  </div>`;
+  // 只显示一级文件夹（顶层），保持简洁
+  const topFolders = allFolders.filter(f => !f.slice(0, -1).includes('/'));
+  topFolders.forEach(folder => {
+    const name = folder.replace(/\/$/, '');
+    const isActive = currentPath === folder || currentPath.startsWith(folder);
+    html += `<div class="folder-tree-item ${isActive ? 'active' : ''}" onclick="navigateTo('${escapeJs(folder)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span class="folder-label">${escapeHtml(name)}</span>
+    </div>`;
+    // 如果当前在这个文件夹内，展开显示子文件夹
+    if (currentPath === folder || currentPath.startsWith(folder)) {
+      const subFolders = allFolders.filter(f => f.startsWith(folder) && f !== folder && f.slice(folder.length).indexOf('/') === f.slice(folder.length).length - 1);
+      subFolders.forEach(sub => {
+        const subName = sub.slice(folder.length).replace(/\/$/, '');
+        html += `<div class="folder-tree-item ${currentPath === sub ? 'active' : ''}" onclick="navigateTo('${escapeJs(sub)}')" style="padding-left:28px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+          <span class="folder-label">${escapeHtml(subName)}</span>
+        </div>`;
+      });
+    }
+  });
+  tree.innerHTML = html;
+}
+
+// ===== Sort & Filter =====
+function sortImages() {
+  const sort = document.getElementById('sort-select').value;
+  const sorted = [...images];
+  switch (sort) {
+    case 'time-desc': sorted.sort((a, b) => new Date(b.uploaded) - new Date(a.uploaded)); break;
+    case 'time-asc': sorted.sort((a, b) => new Date(a.uploaded) - new Date(b.uploaded)); break;
+    case 'size-desc': sorted.sort((a, b) => b.size - a.size); break;
+    case 'size-asc': sorted.sort((a, b) => a.size - b.size); break;
+    case 'name-asc': sorted.sort((a, b) => a.key.localeCompare(b.key)); break;
+    case 'name-desc': sorted.sort((a, b) => b.key.localeCompare(a.key)); break;
+  }
+  images = sorted;
+  filterImages();
+}
+
+function filterImages() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  filteredImages = q ? images.filter(img => img.key.toLowerCase().includes(q)) : [...images];
+  renderGrid();
+}
+
+// ===== Render Grid =====
+function renderGrid() {
+  const grid = document.getElementById('image-grid');
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+
+  if (filteredImages.length === 0 && currentFolders.length === 0) {
+    grid.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <p>${allImages.length === 0 ? '暂无图片，点击上传开始使用' : (q ? '没有匹配的图片' : '此文件夹为空')}</p>
+    </div>`;
+    updateStats();
+    return;
+  }
+
+  // 文件夹卡片（搜索时隐藏文件夹）
+  let folderHtml = '';
+  if (!q) {
+    folderHtml = currentFolders.map(folder => {
+      const name = folder.slice(currentPath.length).replace(/\/$/, '');
+      const fileCount = allImages.filter(img => img.key.startsWith(folder)).length;
+      return `<div class="folder-card" ondblclick="navigateTo('${escapeJs(folder)}')" onclick="navigateTo('${escapeJs(folder)}')" oncontextmenu="showFolderContextMenu(event, '${escapeJs(folder)}')">
+        <div class="folder-actions">
+          <button class="quick-action-btn" onclick="event.stopPropagation();showRenameFolderDialog('${escapeJs(folder)}')" title="重命名文件夹">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          </button>
+          <button class="quick-action-btn" onclick="event.stopPropagation();confirmDeleteFolder('${escapeJs(folder)}')" title="删除文件夹">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          </button>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <div class="folder-name">${escapeHtml(name)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">${fileCount} 个文件</div>
+      </div>`;
+    }).join('');
+  }
+
+  const imageHtml = filteredImages.map((img, idx) => {
+    const url = getImageUrl(img.key);
+    const sel = selectedKeys.has(img.key) ? 'selected' : '';
+    const fname = img.key.replace(/^\d+-/, '');
+    const size = formatSize(img.size);
+    const time = formatTime(img.uploaded);
+    return `<div class="grid-item ${sel}" data-key="${escapeHtml(img.key)}" data-idx="${idx}"
+                 oncontextmenu="showContextMenu(event, ${idx})">
+      <div class="checkbox" onclick="event.stopPropagation();toggleSelect('${escapeJs(img.key)}')">
+        ${sel ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+      </div>
+      <div class="quick-actions">
+        <button class="quick-action-btn" onclick="event.stopPropagation();showCopyPopup('${escapeJs(img.key)}')" title="复制链接">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        </button>
+        <button class="quick-action-btn" onclick="event.stopPropagation();showRenameDialog('${escapeJs(img.key)}')" title="重命名">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        </button>
+        <button class="quick-action-btn" onclick="event.stopPropagation();openEditorByKey('${escapeJs(img.key)}')" title="编辑">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="quick-action-btn" onclick="event.stopPropagation();confirmDelete('${escapeJs(img.key)}')" title="删除">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+      </div>
+      <img src="${url}" alt="${escapeHtml(fname)}" loading="lazy" onclick="openLightbox(${idx})">
+      <div class="info-overlay">
+        <div class="fname">${escapeHtml(fname)}</div>
+        <div class="fmeta">${size} · ${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+  grid.innerHTML = folderHtml + imageHtml;
+  updateStats();
+}
+
+// ===== Selection =====
+function toggleSelect(key) {
+  if (selectedKeys.has(key)) selectedKeys.delete(key);
+  else selectedKeys.add(key);
+  renderGrid();
+  updateBatchActions();
+}
+
+function selectAll() {
+  if (selectedKeys.size === filteredImages.length) {
+    selectedKeys.clear();
+  } else {
+    filteredImages.forEach(img => selectedKeys.add(img.key));
+  }
+  renderGrid();
+  updateBatchActions();
+}
+
+function updateBatchActions() {
+  const el = document.getElementById('batch-actions');
+  el.style.display = selectedKeys.size > 0 ? 'flex' : 'none';
+  document.getElementById('status-selected').textContent = selectedKeys.size > 0 ? `已选 ${selectedKeys.size} 项` : '';
+}
+
+// ===== Grid Size =====
+function setGridSize(val) {
+  document.getElementById('image-grid').style.setProperty('--thumb-size', val + 'px');
+}
+
+// ===== Delete =====
+function confirmDelete(key) {
+  const fname = key.replace(/^\d+-/, '');
+  document.getElementById('delete-msg').textContent = `确定要删除「${fname}」吗？此操作不可撤销。`;
+  document.getElementById('delete-confirm-btn').onclick = () => doDelete([key]);
+  openModal('delete-modal');
+}
+
+function batchDelete() {
+  if (selectedKeys.size === 0) return;
+  document.getElementById('delete-msg').textContent = `确定要删除选中的 ${selectedKeys.size} 个文件吗？此操作不可撤销。`;
+  document.getElementById('delete-confirm-btn').onclick = () => doDelete([...selectedKeys]);
+  openModal('delete-modal');
+}
+
+async function doDelete(keys) {
+  closeModal('delete-modal');
+  let success = 0, fail = 0;
+  for (const key of keys) {
+    try {
+      await apiRequest('DELETE', '/' + encodeURIComponent(key));
+      allImages = allImages.filter(img => img.key !== key);
+      images = images.filter(img => img.key !== key);
+      selectedKeys.delete(key);
+      success++;
+    } catch (e) { fail++; }
+  }
+  if (success) toast(`已删除 ${success} 个文件`, 'success');
+  if (fail) toast(`${fail} 个文件删除失败`, 'error');
+  updateBatchActions();
+  filterImages();
+}
+
+// ===== Rename =====
+let renameOldKey = '';
+
+function showRenameDialog(key) {
+  renameOldKey = key;
+  const fname = key.split('/').pop();
+  document.getElementById('rename-old-name').textContent = `当前：${key}`;
+  const input = document.getElementById('rename-input');
+  input.value = fname;
+  // 恢复确认按钮为文件重命名
+  document.querySelector('#rename-modal .btn-primary').onclick = doRename;
+  updateRenamePreview();
+  openModal('rename-modal');
+  // 选中文件名（不含扩展名）
+  setTimeout(() => {
+    const dotIdx = fname.lastIndexOf('.');
+    input.focus();
+    input.setSelectionRange(0, dotIdx > 0 ? dotIdx : fname.length);
+  }, 100);
+}
+
+function updateRenamePreview() {
+  const newName = document.getElementById('rename-input').value.trim();
+  const preview = document.getElementById('rename-preview');
+  if (newName) {
+    // 保持在同一文件夹内
+    const oldFolder = renameOldKey.includes('/') ? renameOldKey.substring(0, renameOldKey.lastIndexOf('/') + 1) : '';
+    preview.textContent = getImageUrl(oldFolder + newName);
+  } else {
+    preview.textContent = '';
+  }
+}
+
+// 绑定 input 事件
+document.addEventListener('DOMContentLoaded', () => {
+  const ri = document.getElementById('rename-input');
+  if (ri) ri.addEventListener('input', updateRenamePreview);
+  if (ri) ri.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.querySelector('#rename-modal .btn-primary').click(); });
+  const cfi = document.getElementById('new-folder-name');
+  if (cfi) cfi.addEventListener('keydown', (e) => { if (e.key === 'Enter') doCreateFolder(); });
+});
+
+async function doRename() {
+  const newName = document.getElementById('rename-input').value.trim();
+  if (!newName) { toast('请输入新文件名', 'warning'); return; }
+  // 保留文件夹路径前缀
+  const oldFolder = renameOldKey.includes('/') ? renameOldKey.substring(0, renameOldKey.lastIndexOf('/') + 1) : '';
+  const newKey = oldFolder + newName;
+  if (newKey === renameOldKey) { closeModal('rename-modal'); return; }
+
+  try {
+    const c = getConfig();
+    const res = await fetch(c.workerUrl + '/rename', {
+      method: 'PUT',
+      headers: { 'X-Auth-Token': c.authToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldKey: renameOldKey, newKey }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    // 更新本地数据
+    [allImages, images].forEach(list => {
+      const img = list.find(i => i.key === renameOldKey);
+      if (img) img.key = data.key;
+    });
+    selectedKeys.delete(renameOldKey);
+
+    closeModal('rename-modal');
+    toast('重命名成功', 'success');
+    filterImages();
+  } catch (e) {
+    toast('重命名失败: ' + e.message, 'error');
+  }
+}
+
+// ===== Folder Management =====
+function showCreateFolderDialog() {
+  document.getElementById('new-folder-name').value = '';
+  openModal('create-folder-modal');
+  setTimeout(() => document.getElementById('new-folder-name').focus(), 100);
+}
+
+async function doCreateFolder() {
+  const name = document.getElementById('new-folder-name').value.trim();
+  if (!name) { toast('请输入文件夹名称', 'warning'); return; }
+  if (!/^[a-zA-Z0-9\u4e00-\u9fa5_-]+$/.test(name)) { toast('文件夹名称只能包含字母、数字、中文、下划线和连字符', 'warning'); return; }
+
+  const folderPath = currentPath + name + '/';
+  // R2 没有真正的文件夹概念，创建一个 .folder 占位文件
+  // 或者直接在本地添加到 allFolders 中（上传文件时自然会创建）
+  // 为了让空文件夹也能显示，上传一个 0 字节的占位文件
+  try {
+    const c = getConfig();
+    const placeholder = new File([new Uint8Array(0)], '.folder', { type: 'application/octet-stream' });
+    const fd = new FormData();
+    fd.append('file', placeholder);
+    fd.append('path', folderPath);
+    await apiRequest('POST', '/', fd);
+
+    if (!allFolders.includes(folderPath)) allFolders.push(folderPath);
+    allFolders.sort();
+    closeModal('create-folder-modal');
+    toast(`文件夹「${name}」已创建`, 'success');
+    navigateTo(currentPath);
+  } catch (e) {
+    toast('创建失败: ' + e.message, 'error');
+  }
+}
+
+function confirmDeleteFolder(folder) {
+  const name = folder.replace(/\/$/, '').split('/').pop();
+  const fileCount = allImages.filter(img => img.key.startsWith(folder)).length;
+  const msg = fileCount > 0
+    ? `文件夹「${name}」内有 ${fileCount} 个文件，删除后所有文件将被永久删除。确定吗？`
+    : `确定要删除空文件夹「${name}」吗？`;
+  document.getElementById('delete-msg').textContent = msg;
+  document.getElementById('delete-confirm-btn').onclick = () => doDeleteFolder(folder);
+  openModal('delete-modal');
+}
+
+async function doDeleteFolder(folder) {
+  closeModal('delete-modal');
+  const filesToDelete = allImages.filter(img => img.key.startsWith(folder));
+  let success = 0, fail = 0;
+  for (const img of filesToDelete) {
+    try {
+      await apiRequest('DELETE', '/' + encodeURIComponent(img.key));
+      success++;
+    } catch { fail++; }
+  }
+  // 也删除占位文件
+  try { await apiRequest('DELETE', '/' + encodeURIComponent(folder + '.folder')); } catch {}
+
+  allImages = allImages.filter(img => !img.key.startsWith(folder));
+  allFolders = allFolders.filter(f => !f.startsWith(folder));
+  selectedKeys.clear();
+
+  if (currentPath.startsWith(folder)) currentPath = '';
+  toast(`已删除文件夹${success > 0 ? '，含 ' + success + ' 个文件' : ''}`, 'success');
+  if (fail) toast(`${fail} 个文件删除失败`, 'error');
+  navigateTo(currentPath);
+}
+
+function showRenameFolderDialog(folder) {
+  const name = folder.replace(/\/$/, '').split('/').pop();
+  renameOldKey = folder;
+  document.getElementById('rename-old-name').textContent = `当前文件夹：${folder}`;
+  const input = document.getElementById('rename-input');
+  input.value = name;
+  openModal('rename-modal');
+  // 修改确认按钮行为
+  document.querySelector('#rename-modal .btn-primary').onclick = () => doRenameFolder(folder);
+  setTimeout(() => { input.focus(); input.select(); }, 100);
+}
+
+async function doRenameFolder(oldFolder) {
+  const newName = document.getElementById('rename-input').value.trim();
+  if (!newName) { toast('请输入名称', 'warning'); return; }
+  // 构建新文件夹路径
+  const parentPath = oldFolder.replace(/[^/]+\/$/, '');
+  const newFolder = parentPath + newName + '/';
+  if (newFolder === oldFolder) { closeModal('rename-modal'); return; }
+
+  // 移动所有文件
+  const filesToMove = allImages.filter(img => img.key.startsWith(oldFolder));
+  let success = 0, fail = 0;
+  for (const img of filesToMove) {
+    const newKey = newFolder + img.key.slice(oldFolder.length);
+    try {
+      const c = getConfig();
+      const res = await fetch(c.workerUrl + '/rename', {
+        method: 'PUT',
+        headers: { 'X-Auth-Token': c.authToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldKey: img.key, newKey }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      img.key = newKey;
+      success++;
+    } catch { fail++; }
+  }
+
+  // 更新文件夹列表
+  allFolders = allFolders.map(f => f.startsWith(oldFolder) ? newFolder + f.slice(oldFolder.length) : f);
+  if (currentPath.startsWith(oldFolder)) currentPath = newFolder + currentPath.slice(oldFolder.length);
+
+  closeModal('rename-modal');
+  // 恢复确认按钮
+  document.querySelector('#rename-modal .btn-primary').onclick = doRename;
+  toast(`文件夹已重命名为「${newName}」`, 'success');
+  if (fail) toast(`${fail} 个文件移动失败`, 'error');
+  navigateTo(currentPath);
+}
+
+function showFolderContextMenu(e, folder) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelectorAll('.context-menu').forEach(m => m.remove());
+  const name = folder.replace(/\/$/, '').split('/').pop();
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.innerHTML = `
+    <button class="context-menu-item" onclick="navigateTo('${escapeJs(folder)}');this.parentElement.remove()">打开</button>
+    <button class="context-menu-item" onclick="showRenameFolderDialog('${escapeJs(folder)}');this.parentElement.remove()">重命名</button>
+    <div class="context-menu-sep"></div>
+    <button class="context-menu-item danger" onclick="confirmDeleteFolder('${escapeJs(folder)}');this.parentElement.remove()">删除</button>`;
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+  const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } };
+  setTimeout(() => document.addEventListener('click', close), 0);
+}
+
+// ===== Move to Folder =====
+function showMoveDialog(singleKey) {
+  const keys = singleKey ? [singleKey] : [...selectedKeys];
+  if (keys.length === 0) { toast('请先选择文件', 'warning'); return; }
+  document.getElementById('move-info').textContent = `移动 ${keys.length} 个文件到：`;
+  moveTargetFolder = '';
+
+  // Build folder options
+  let html = `<div class="folder-select-item ${moveTargetFolder === '' ? 'selected' : ''}" onclick="selectMoveTarget('', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>根目录</span>
+  </div>`;
+  allFolders.forEach(folder => {
+    const name = folder.replace(/\/$/, '');
+    html += `<div class="folder-select-item" onclick="selectMoveTarget('${escapeJs(folder)}', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span>${escapeHtml(name)}</span>
+    </div>`;
+  });
+  document.getElementById('move-folder-list').innerHTML = html;
+  // Store keys to move
+  document.getElementById('move-modal').dataset.keys = JSON.stringify(keys);
+  openModal('move-modal');
+}
+
+function selectMoveTarget(folder, el) {
+  moveTargetFolder = folder;
+  document.querySelectorAll('#move-folder-list .folder-select-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function doMoveToFolder() {
+  const keys = JSON.parse(document.getElementById('move-modal').dataset.keys || '[]');
+  if (keys.length === 0) return;
+
+  closeModal('move-modal');
+  let success = 0, fail = 0;
+  for (const oldKey of keys) {
+    // 提取文件名（不含旧路径）
+    const fileName = oldKey.includes('/') ? oldKey.split('/').pop() : oldKey;
+    const newKey = moveTargetFolder + fileName;
+    if (newKey === oldKey) { success++; continue; }
+    try {
+      const c = getConfig();
+      const res = await fetch(c.workerUrl + '/rename', {
+        method: 'PUT',
+        headers: { 'X-Auth-Token': c.authToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldKey, newKey }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const img = allImages.find(i => i.key === oldKey);
+      if (img) img.key = newKey;
+      selectedKeys.delete(oldKey);
+      success++;
+    } catch { fail++; }
+  }
+
+  // 重新计算文件夹
+  const folderSet = new Set();
+  allImages.forEach(img => {
+    const parts = img.key.split('/');
+    if (parts.length > 1) {
+      for (let i = 1; i < parts.length; i++) {
+        folderSet.add(parts.slice(0, i).join('/') + '/');
+      }
+    }
+  });
+  allFolders = [...folderSet].sort();
+
+  toast(`已移动 ${success} 个文件`, 'success');
+  if (fail) toast(`${fail} 个文件移动失败`, 'error');
+  updateBatchActions();
+  navigateTo(currentPath);
+}
+
+// ===== Upload =====
+function showUploadDialog() {
+  if (!hasConfig()) { showSettings(true); return; }
+  document.getElementById('upload-list').innerHTML = '';
+  document.getElementById('file-input').value = '';
+  openModal('upload-modal');
+}
+
+function setupDragDrop() {
+  const overlay = document.getElementById('drop-overlay');
+  let dragCounter = 0;
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    overlay.classList.add('visible');
+  });
+  document.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; overlay.classList.remove('visible'); }
+  });
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    overlay.classList.remove('visible');
+    if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files);
+  });
+
+  // Upload modal dropzone
+  const udz = document.getElementById('upload-dropzone');
+  udz.addEventListener('dragover', (e) => { e.preventDefault(); udz.style.borderColor = 'var(--accent)'; udz.style.background = 'var(--accent-dim)'; });
+  udz.addEventListener('dragleave', () => { udz.style.borderColor = 'var(--border)'; udz.style.background = ''; });
+  udz.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    udz.style.borderColor = 'var(--border)'; udz.style.background = '';
+    handleFileSelect(e.dataTransfer.files);
+  });
+}
+
+async function handleFileSelect(files) {
+  if (!hasConfig()) { showSettings(true); return; }
+  const list = document.getElementById('upload-list');
+  if (!document.getElementById('upload-modal').classList.contains('visible')) {
+    openModal('upload-modal');
+  }
+
+  for (const file of files) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast(`${file.name} 超过 20MB 限制，已跳过`, 'error');
+      continue;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast(`${file.name} 大于 5MB，正在上传…`, 'warning');
+    }
+
+    const item = document.createElement('div');
+    item.style.cssText = 'padding:8px 0;border-bottom:1px solid var(--border);';
+    item.innerHTML = `<div style="display:flex;align-items:center;gap:8px;">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(file.name)}</span>
+      <span style="color:var(--text-muted);font-size:12px;">${formatSize(file.size)}</span>
+      <span class="upload-status" style="color:var(--accent);font-size:12px;">上传中…</span>
+    </div>
+    <div style="height:3px;background:var(--bg-tertiary);border-radius:2px;margin-top:6px;overflow:hidden;">
+      <div class="upload-bar" style="height:100%;width:0;background:var(--accent);border-radius:2px;transition:width 0.2s;"></div>
+    </div>`;
+    list.prepend(item);
+
+    const bar = item.querySelector('.upload-bar');
+    const status = item.querySelector('.upload-status');
+    const progressEl = document.getElementById('upload-progress');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (currentPath) fd.append('path', currentPath);
+      progressEl.style.display = 'block';
+      const data = await apiRequest('POST', '/', fd, (pct) => {
+        const p = Math.round(pct * 100);
+        bar.style.width = p + '%';
+        progressEl.style.width = p + '%';
+      });
+      bar.style.width = '100%';
+      bar.style.background = 'var(--success)';
+      status.textContent = '完成';
+      status.style.color = 'var(--success)';
+      progressEl.style.display = 'none';
+      progressEl.style.width = '0';
+
+      // Add to local list
+      const newKey = data.key;
+      const newImg = { key: newKey, size: file.size, uploaded: new Date().toISOString() };
+      allImages.unshift(newImg);
+      images.unshift(newImg);
+      filterImages();
+    } catch (e) {
+      bar.style.background = 'var(--danger)';
+      status.textContent = '失败';
+      status.style.color = 'var(--danger)';
+      progressEl.style.display = 'none';
+      toast(`上传失败: ${file.name} — ${e.message}`, 'error');
+    }
+  }
+}
+
+// ===== Copy Links =====
+function showCopyPopup(key) {
+  const url = getImageUrl(key);
+  const fname = key.replace(/^\d+-/, '');
+  const md = `![${fname}](${url})`;
+  const html = `<img src="${url}" alt="${fname}">`;
+  const bb = `[img]${url}[/img]`;
+
+  document.getElementById('copy-modal-title').textContent = '复制链接';
+  document.getElementById('copy-modal-body').innerHTML = `<div class="copy-popup">
+    <div class="copy-row"><span class="copy-label">URL</span><input class="copy-input" value="${escapeHtml(url)}" readonly><button class="copy-btn" onclick="copyText('${escapeJs(url)}',this)">复制</button></div>
+    <div class="copy-row"><span class="copy-label">Markdown</span><input class="copy-input" value="${escapeHtml(md)}" readonly><button class="copy-btn" onclick="copyText('${escapeJs(md)}',this)">复制</button></div>
+    <div class="copy-row"><span class="copy-label">HTML</span><input class="copy-input" value="${escapeHtml(html)}" readonly><button class="copy-btn" onclick="copyText('${escapeJs(html)}',this)">复制</button></div>
+    <div class="copy-row"><span class="copy-label">BBCode</span><input class="copy-input" value="${escapeHtml(bb)}" readonly><button class="copy-btn" onclick="copyText('${escapeJs(bb)}',this)">复制</button></div>
+  </div>`;
+  openModal('copy-modal');
+}
+
+function batchCopyLinks() {
+  if (selectedKeys.size === 0) return;
+  const links = [...selectedKeys].map(key => getImageUrl(key));
+  const mdLinks = [...selectedKeys].map(key => {
+    const fname = key.replace(/^\d+-/, '');
+    return `![${fname}](${getImageUrl(key)})`;
+  });
+
+  document.getElementById('copy-modal-title').textContent = `复制 ${selectedKeys.size} 个链接`;
+  document.getElementById('copy-modal-body').innerHTML = `<div class="copy-popup">
+    <div class="copy-row"><span class="copy-label">URL</span><input class="copy-input" value="${escapeHtml(links.join('\n'))}" readonly><button class="copy-btn" onclick="copyText(\`${escapeJs(links.join('\n'))}\`,this)">复制</button></div>
+    <div class="copy-row"><span class="copy-label">Markdown</span><input class="copy-input" value="${escapeHtml(mdLinks.join('\n'))}" readonly><button class="copy-btn" onclick="copyText(\`${escapeJs(mdLinks.join('\n'))}\`,this)">复制</button></div>
+  </div>`;
+  openModal('copy-modal');
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = '已复制';
+    btn.style.background = 'var(--success)';
+    setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+  } catch { toast('复制失败', 'error'); }
+}
+
+function copyCurrentLink(type) {
+  if (lightboxIndex < 0) return;
+  const img = filteredImages[lightboxIndex];
+  const url = getImageUrl(img.key);
+  const fname = img.key.replace(/^\d+-/, '');
+  let text = url;
+  if (type === 'md') text = `![${fname}](${url})`;
+  navigator.clipboard.writeText(text).then(() => toast('已复制', 'success'));
+}
+
+// ===== Lightbox =====
+function openLightbox(idx) {
+  lightboxIndex = idx;
+  const img = filteredImages[idx];
+  const url = getImageUrl(img.key);
+  document.getElementById('lb-image').src = url;
+  const fname = img.key.replace(/^\d+-/, '');
+  document.getElementById('lb-info').textContent = `${fname} · ${formatSize(img.size)} · ${formatTime(img.uploaded)}`;
+  document.getElementById('lightbox').classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('visible');
+  document.body.style.overflow = '';
+  lightboxIndex = -1;
+}
+
+function lightboxNav(dir) {
+  if (filteredImages.length === 0) return;
+  lightboxIndex = (lightboxIndex + dir + filteredImages.length) % filteredImages.length;
+  const img = filteredImages[lightboxIndex];
+  const url = getImageUrl(img.key);
+  document.getElementById('lb-image').src = url;
+  const fname = img.key.replace(/^\d+-/, '');
+  document.getElementById('lb-info').textContent = `${fname} · ${formatSize(img.size)} · ${formatTime(img.uploaded)}`;
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('lightbox').classList.contains('visible')) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+  }
+  if (document.querySelector('.modal-backdrop.visible') && e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.visible').forEach(m => {
+      if (m.id !== 'lightbox') m.classList.remove('visible');
+    });
+  }
+});
+
+// ===== Editor =====
+function openEditorByKey(key) {
+  const idx = filteredImages.findIndex(img => img.key === key);
+  if (idx >= 0) openEditor(idx);
+}
+
+async function openEditor(idx) {
+  closeLightbox();
+  const img = filteredImages[idx];
+  editorKey = img.key;
+  editorFormat = 'original';
+  editorMimeType = '';
+
+  // 通过 Worker API fetch 图片为 blob，避免 CORS 污染 canvas
+  const c = getConfig();
+  const edImg = document.getElementById('editor-image');
+  const container = document.getElementById('editor-preview-container');
+  container.innerHTML = '<div class="loading-spinner" style="height:200px"><div class="spinner"></div><span>加载图片…</span></div>';
+
+  // Reset UI
+  document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.ratio-btn').classList.add('active');
+  document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.format-btn[data-fmt="original"]').classList.add('active');
+  document.getElementById('quality-slider').value = 85;
+  document.getElementById('quality-val').textContent = '85';
+  lockRatio = true;
+
+  openModal('editor-modal');
+
+  try {
+    const res = await fetch(c.workerUrl + '/' + encodeURIComponent(img.key));
+    if (!res.ok) throw new Error('加载失败');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // 重新插入 img 元素（Cropper 需要干净的 img）
+    container.innerHTML = '';
+    const newImg = document.createElement('img');
+    newImg.id = 'editor-image';
+    newImg.src = blobUrl;
+    container.appendChild(newImg);
+
+    newImg.onload = () => {
+      editorNaturalWidth = newImg.naturalWidth;
+      editorNaturalHeight = newImg.naturalHeight;
+      document.getElementById('resize-w').value = editorNaturalWidth;
+      document.getElementById('resize-h').value = editorNaturalHeight;
+      document.getElementById('resize-w').placeholder = editorNaturalWidth;
+      document.getElementById('resize-h').placeholder = editorNaturalHeight;
+
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(newImg, {
+        viewMode: 1,
+        autoCropArea: 1,
+        responsive: true,
+        background: false,
+      });
+    };
+  } catch (e) {
+    container.innerHTML = `<p style="color:var(--danger)">图片加载失败: ${e.message}</p>`;
+    toast('编辑器图片加载失败', 'error');
+  }
+}
+
+function closeEditor() {
+  if (cropper) { cropper.destroy(); cropper = null; }
+  closeModal('editor-modal');
+}
+
+function setCropRatio(ratio, btn) {
+  document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (cropper) cropper.setAspectRatio(ratio);
+}
+
+function setFormat(fmt, btn) {
+  document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  editorFormat = fmt;
+}
+
+function toggleLockRatio() {
+  lockRatio = !lockRatio;
+  document.getElementById('lock-ratio-btn').style.opacity = lockRatio ? 1 : 0.4;
+}
+
+function onResizeInput(dim) {
+  if (!lockRatio || !editorNaturalWidth || !editorNaturalHeight) return;
+  const ratio = editorNaturalWidth / editorNaturalHeight;
+  if (dim === 'w') {
+    const w = parseInt(document.getElementById('resize-w').value) || 0;
+    document.getElementById('resize-h').value = Math.round(w / ratio);
+  } else {
+    const h = parseInt(document.getElementById('resize-h').value) || 0;
+    document.getElementById('resize-w').value = Math.round(h * ratio);
+  }
+}
+
+async function applyEdits(overwrite) {
+  if (!cropper) return;
+  const quality = parseInt(document.getElementById('quality-slider').value) / 100;
+  const targetW = parseInt(document.getElementById('resize-w').value) || editorNaturalWidth;
+  const targetH = parseInt(document.getElementById('resize-h').value) || editorNaturalHeight;
+
+  // Get cropped canvas
+  const croppedCanvas = cropper.getCroppedCanvas({
+    width: targetW,
+    height: targetH,
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: 'high',
+  });
+
+  // Determine output format
+  let mimeType;
+  let ext;
+  if (editorFormat === 'original') {
+    // Guess from key
+    const keyLower = editorKey.toLowerCase();
+    if (keyLower.endsWith('.png')) { mimeType = 'image/png'; ext = 'png'; }
+    else if (keyLower.endsWith('.webp')) { mimeType = 'image/webp'; ext = 'webp'; }
+    else if (keyLower.endsWith('.gif')) { mimeType = 'image/gif'; ext = 'gif'; }
+    else { mimeType = 'image/jpeg'; ext = 'jpg'; }
+  } else {
+    mimeType = editorFormat;
+    if (mimeType === 'image/jpeg') ext = 'jpg';
+    else if (mimeType === 'image/png') ext = 'png';
+    else if (mimeType === 'image/webp') ext = 'webp';
+    else ext = 'png';
+  }
+
+  const blob = await new Promise(resolve => croppedCanvas.toBlob(resolve, mimeType, quality));
+
+  if (overwrite) {
+    // Delete old, upload new with same-ish name
+    try {
+      await apiRequest('DELETE', '/' + encodeURIComponent(editorKey));
+    } catch (e) { /* ignore delete failure */ }
+  }
+
+  // 提取文件夹路径和文件名
+  const editorFolder = editorKey.includes('/') ? editorKey.substring(0, editorKey.lastIndexOf('/') + 1) : '';
+  const baseName = editorKey.split('/').pop();
+  const fname = overwrite
+    ? baseName.replace(/^\d+-/, '').replace(/\.[^.]+$/, '') + '.' + ext
+    : baseName.replace(/^\d+-/, '').replace(/\.[^.]+$/, '') + '_edited.' + ext;
+
+  const file = new File([blob], fname, { type: mimeType });
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (editorFolder) fd.append('path', editorFolder);
+    const data = await apiRequest('POST', '/', fd);
+    toast(overwrite ? '已覆盖原图' : '已上传新副本', 'success');
+    closeEditor();
+    loadImages();
+  } catch (e) {
+    toast('上传失败: ' + e.message, 'error');
+  }
+}
+
+// ===== Context Menu =====
+function showContextMenu(e, idx) {
+  e.preventDefault();
+  // Remove existing
+  document.querySelectorAll('.context-menu').forEach(m => m.remove());
+  const img = filteredImages[idx];
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.innerHTML = `
+    <button class="context-menu-item" onclick="openLightbox(${idx});this.parentElement.remove()">预览</button>
+    <button class="context-menu-item" onclick="showCopyPopup('${escapeJs(img.key)}');this.parentElement.remove()">复制链接</button>
+    <button class="context-menu-item" onclick="showRenameDialog('${escapeJs(img.key)}');this.parentElement.remove()">重命名</button>
+    <button class="context-menu-item" onclick="showMoveDialog('${escapeJs(img.key)}');this.parentElement.remove()">移动到文件夹</button>
+    <button class="context-menu-item" onclick="openEditorByKey('${escapeJs(img.key)}');this.parentElement.remove()">编辑</button>
+    <div class="context-menu-sep"></div>
+    <button class="context-menu-item danger" onclick="confirmDelete('${escapeJs(img.key)}');this.parentElement.remove()">删除</button>`;
+  document.body.appendChild(menu);
+
+  // Adjust position if overflowing
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+
+  const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); } };
+  setTimeout(() => document.addEventListener('click', close), 0);
+}
+
+// ===== Modal Helpers =====
+function openModal(id) { document.getElementById(id).classList.add('visible'); }
+function closeModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+// ===== Toast =====
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ===== Stats =====
+function updateStats() {
+  document.getElementById('stat-count').textContent = allImages.length;
+  const totalSize = allImages.reduce((sum, img) => sum + (img.size || 0), 0);
+  document.getElementById('stat-size').textContent = formatSize(totalSize);
+  document.getElementById('stat-avg').textContent = allImages.length ? formatSize(Math.round(totalSize / allImages.length)) : '—';
+  const folderInfo = currentPath ? ` (${currentPath.replace(/\/$/, '')})` : '';
+  document.getElementById('status-total').textContent = `当前 ${filteredImages.length} 个文件${folderInfo} · 总计 ${allImages.length} 个`;
+
+  const c = getConfig();
+  const domain = c.customDomain || c.workerUrl;
+  document.getElementById('status-domain').textContent = domain ? domain.replace(/^https?:\/\//, '') : '';
+}
+
+// ===== Helpers =====
+function formatSize(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let size = bytes;
+  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+  return size.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function escapeJs(s) {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+</script>
+</body>
+</html>
